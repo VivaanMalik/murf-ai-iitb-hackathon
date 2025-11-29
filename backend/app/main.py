@@ -1,10 +1,13 @@
+import base64
 import os
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import time
+import pygame     # tmp
+from app.services import generate_murf_speech
 from typing import Optional
 
-# 1. Initialize the App
 app = FastAPI(
     title="Murf Voice Agent API",
     description="Backend for conversational agent using Murf TTS and LLMs",
@@ -48,20 +51,40 @@ async def health_check():
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     """
-    Main conversational loop:
-    1. Receive text from Lovable frontend.
-    2. (TODO) Send to LLM (OpenAI/Groq).
-    3. (TODO) Send LLM response to Murf Falcon TTS.
-    4. Return text + audio to frontend.
+    Main conversational loop
     """
-    
-    # --- PLACEHOLDER LOGIC ---
-    # In a real app, you would call your LLM and Murf API here.
-    fake_llm_response = f"I received your message: '{request.user_message}'. This is a placeholder response."
-    
+    print(f"📩 Received user message: {request.user_message}")
+
+    # 1. (TODO) Call LLM here later
+    # For now, we just repeat what the user said to test the voice.
+    agent_text_response = f"no, you {request.user_message}"
+
+    audio_b64 = generate_murf_speech(agent_text_response)
+    audio_bytes = base64.b64decode(audio_b64)
+
+    temp_filename = "../assets/tmp_audio.mp3"
+    with open(temp_filename, "wb") as f:
+        f.write(audio_bytes)
+    print(f"🔊 Playing audio locally from {temp_filename}...")
+
+    # use pygame to play audio
+    # temp until i have frontend
+    pygame.mixer.init()
+    pygame.mixer.music.load(temp_filename)
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy():
+        time.sleep(0.1)
+    pygame.mixer.quit()
+
+    try:
+        os.remove(temp_filename)
+        print("🧹 6. DELETED TEMP FILE")
+    except:
+        print("⚠️ Could not delete temp file (might be locked)")         
+
     return ChatResponse(
-        agent_text=fake_llm_response,
-        audio_base64=None, # You will fill this with Murf's audio bytes
+        agent_text=agent_text_response,
+        audio_base64=audio_b64,
         status="success"
     )
 
