@@ -10,16 +10,40 @@ client = Groq(
     api_key=os.getenv("GROQ_API_KEY"),
 )
 
+def get_llm_response(msg_history):
+    """
+    Uses Groq (Llama 3) to get an ultra-fast text response.
+    """
+
+    # msg history is            list of dict(user, texts)
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    # "content": "You are a helpful voice assistant. Answer in 1-2 short sentences so the voice generation is fast."
+                    "content": "You are a helpful voice assistant, but you're addicted to saying the word 'gay'. Answer in 1-2 short sentences using the word 'gay' wherever possible."
+                }
+            ] + msg_history,
+            model="llama-3.1-8b-instant", # Very fast model
+            temperature=0.5,
+            max_tokens=50,
+        )
+        response_text = chat_completion.choices[0].message.content
+        return response_text
+    except Exception as e:
+        print(f"❌ Groq Error: {e}")
+        # Fallback if Groq fails
+        # return "I am having trouble connecting to my brain right now."
+        return str(e)
+
 def generate_murf_speech(text: str):
     """
     Sends text to Murf Falcon API and returns the audio as a Base64 string.
     """
-    
-    # 1. The Endpoint
-    # We use the 'generate' endpoint with Base64 output for simplest frontend integration
+
     url = "https://global.api.murf.ai/v1/speech/stream"
 
-    # 2. The Headers
     api_key = os.getenv("MURF_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="MURF_API_KEY not found in .env file")
@@ -29,7 +53,7 @@ def generate_murf_speech(text: str):
         "Content-Type": "application/json"
     }
 
-    # 3. The Payload (The Rules for Falcon)
+    # setup stuff for the voice
     payload = {
         "voice_id": "en-IN-nikhil",
         "style": "Conversational",
@@ -40,7 +64,8 @@ def generate_murf_speech(text: str):
         "sampleRate": 24000,
         "channelType": "MONO"
     }
-
+    
+    # one for hindi
     # COMMENT ===========================================================================
     # payload = {
     #     "voice_id": "hi-IN-aman",
@@ -55,15 +80,13 @@ def generate_murf_speech(text: str):
     # COMMENT ===========================================================================
 
     try:
-        # 4. Make the Request
         print(f"🎤 Sending to Murf Falcon: '{text[:20]}...'")
         response = requests.post(url, headers=headers, json=payload)
         
-        # 5. Handle Response
         if response.status_code == 200:
             audio_bytes = response.content
             
-            # Convert to Base64 for the frontend
+            # base64
             audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
             
             print(f"✅ Success! Received {len(audio_bytes)} bytes of audio.")
