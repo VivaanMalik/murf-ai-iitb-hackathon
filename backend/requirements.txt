@@ -9,3 +9,4 @@ arxiv
 tavily-python
 pymupdf
 googlesearch-python
+numpy
