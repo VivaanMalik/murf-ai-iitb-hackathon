@@ -3,9 +3,10 @@ import os
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import time
-import pygame     # tmp
-from app.services import generate_murf_speech, get_llm_response
+# import time
+# import pygame     # tmp
+from fastapi.responses import StreamingResponse
+from app.services import stream_audio_from_list, get_llm_response, get_deepgram_transcription
 from typing import Optional
 
 app = FastAPI(
@@ -15,6 +16,7 @@ app = FastAPI(
 )
 
 chat_mem = {}
+user_configs = {}
 
 origins = [
     "http://localhost:5173",
@@ -58,40 +60,23 @@ async def chat_endpoint(request: ChatRequest):
     user_text = request.user_message
     if user_id not in chat_mem:
         chat_mem[user_id] = []
+        user_configs[user_id] = {"rate": 0, "pitch": 0, "style": "Conversational"}
     chat_mem[user_id].append({"role": "user", "content": user_text})
 
-    print(f"📩 Received user message: {chat_mem[user_id]}")
+    llm_response = get_llm_response(chat_mem[user_id], user_configs[user_id])
 
-    agent_text_response = get_llm_response(chat_mem[user_id])
-    # agent_text_response = f"no, you {request.user_message}"
+    agent_text_response = llm_response.get("text", ["Sorry, I broke."])
+    new_config = llm_response.get("config", {})
 
-    chat_mem[user_id].append({"role": "assistant", "content": agent_text_response})
+    if new_config:
+        user_configs[user_id].update(new_config)
 
-    audio_b64 = generate_murf_speech(agent_text_response)
-    audio_bytes = base64.b64decode(audio_b64)
+    full_response_text = " ".join(agent_text_response)
+    chat_mem[user_id].append({"role": "assistant", "content": full_response_text})
 
-    temp_filename = "../assets/tmp_audio.mp3"
-    with open(temp_filename, "wb") as f:
-        f.write(audio_bytes)
-
-    # use pygame to play audio
-    # temp until i have frontend
-    pygame.mixer.init()
-    pygame.mixer.music.load(temp_filename)
-    pygame.mixer.music.play()
-    while pygame.mixer.music.get_busy():
-        time.sleep(0.1)
-    pygame.mixer.quit()
-
-    try:
-        os.remove(temp_filename)
-    except:
-        print("couldnt delete tmp file...")    
-
-    return ChatResponse(
-        agent_text=agent_text_response,
-        audio_base64=audio_b64,
-        status="success"
+    return StreamingResponse(
+        stream_audio_from_list(agent_text_response, user_configs[user_id]),
+        media_type="application/x-ndjson"
     )
 
 @app.post("/api/transcribe")
@@ -100,7 +85,15 @@ async def transcribe_audio(file: UploadFile = File(...)):
     Receives an audio file (blob) from the microphone, 
     sends it to Deepgram/AssemblyAI, and returns text.
     """
-    return {"transcription": "This is a placeholder for ASR output."}
+    audio_bytes = await file.read()
+    
+    transcribed_text = get_deepgram_transcription(audio_bytes)
+    
+    if not transcribed_text:
+        # Fallback if silence
+        transcribed_text = ""
+        
+    return {"transcription": transcribed_text}
 
 if __name__ == "__main__":
     import uvicorn
