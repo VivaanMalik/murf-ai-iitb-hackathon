@@ -1,10 +1,9 @@
 import base64
 import os
-from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-# import time
-# import pygame     # tmp
+from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect # Add WebSocket
+from app.services import stream_deepgram_transcription, stream_audio_from_list, get_llm_response # Add stream_deepgram_transcription
 from fastapi.responses import StreamingResponse
 from app.services import stream_audio_from_list, get_llm_response, get_deepgram_transcription
 from typing import Optional
@@ -60,7 +59,13 @@ async def chat_endpoint(request: ChatRequest):
     user_text = request.user_message
     if user_id not in chat_mem:
         chat_mem[user_id] = []
-        user_configs[user_id] = {"rate": 0, "pitch": 0, "style": "Conversational"}
+        user_configs[user_id] = {
+            "rate": 0, 
+            "pitch": 0, 
+            "style": "Conversational",
+            "temperature": 0.5,
+            "accent_color": "brand-blue"
+        }
     chat_mem[user_id].append({"role": "user", "content": user_text})
 
     llm_response = get_llm_response(chat_mem[user_id], user_configs[user_id])
@@ -75,7 +80,7 @@ async def chat_endpoint(request: ChatRequest):
     chat_mem[user_id].append({"role": "assistant", "content": full_response_text})
 
     return StreamingResponse(
-        stream_audio_from_list(agent_text_response, user_configs[user_id]),
+        stream_audio_from_list(agent_text_response, user_configs[user_id], full_response_text),
         media_type="application/x-ndjson"
     )
 
@@ -94,6 +99,16 @@ async def transcribe_audio(file: UploadFile = File(...)):
         transcribed_text = ""
         
     return {"transcription": transcribed_text}
+
+@app.websocket("/ws/transcribe")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        await stream_deepgram_transcription(websocket)
+    except WebSocketDisconnect:
+        print("Client disconnected")
+    except Exception as e:
+        print(f"WS Error: {e}")
 
 if __name__ == "__main__":
     import uvicorn

@@ -10,3 +10,4 @@ tavily-python
 pymupdf
 googlesearch-python
 numpy
+num2words
