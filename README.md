@@ -21,6 +21,9 @@ wrap text
 
 TODO:
 
+add urls
+UI glictches - text on the text area and the transcription visualization and the normal visualization and the color of tehe thing behind the mic and the word wrap and the latex and the spekaing of numbers in a natural way by breaking it down into tiny tiny parts
+
 read documents/pdf
 pdf plumber
 upload pdf feature      summarize (without loss of info nd generate mermaid markdown)
@@ -28,7 +31,6 @@ playwright
 interrupt
 
 UI
-add urls
 mermaid markdown and present it
 posprocess tool's outputs to put in conversational language
 OCR
