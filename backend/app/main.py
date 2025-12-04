@@ -2,12 +2,13 @@ import base64
 import os
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from typing import Optional
 from contextlib import asynccontextmanager
 from app.storage import init_db
 from app.services import stream_audio_from_list, get_llm_response, get_deepgram_transcription, stream_deepgram_transcription, ingest_pdf, summarise_history, find_pdf_links, ingest_pdf_from_url
+from app.routes_knowledge import router as knowledge_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -26,6 +27,8 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+app.include_router(knowledge_router)
 
 chat_mem = {}
 user_configs = {}
@@ -63,14 +66,14 @@ async def health_check():
 
 # the avtual chat
 @app.post("/api/chat")
-async def chat_endpoint(request: Request, body: ChatRequest):
+async def chat_endpoint(request: Request, body: ChatRequest, background_tasks: BackgroundTasks,):
     """
     Main conversational loop
     """
 
     pdf_urls = await find_pdf_links(body.user_message)
     for url in pdf_urls:
-        await ingest_pdf_from_url(url)
+        background_tasks.add_task(ingest_pdf_from_url, url)
 
     # def users
     user_id = body.user_id
@@ -118,25 +121,16 @@ async def chat_endpoint(request: Request, body: ChatRequest):
         )
 
     chat_mem[user_id] = chat_mem[user_id][-MAX_MESSAGES:]
-
-
-
-
-
-
-
-    # ✅ makes stream cancellable
+    
     async def event_stream():
-        # stream_audio_from_list is a normal (sync) generator, so just `for`
         for chunk in stream_audio_from_list(
             agent_text_response,
             user_configs[user_id]
         ):
-            # if client disconnected, stop streaming
             if await request.is_disconnected():
                 print(f"Client {user_id} disconnected, stopping stream")
                 break
-            yield chunk  # already NDJSON string with "\n"
+            yield chunk
 
     return StreamingResponse(
         event_stream(),

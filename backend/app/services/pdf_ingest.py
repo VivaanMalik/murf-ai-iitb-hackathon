@@ -3,25 +3,26 @@ import json
 import os
 import io
 import httpx
+import uuid
 import google.generativeai as genai
-from urllib.parse import urlparse
 from app.storage import store_document_chunks
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 gemini = genai.GenerativeModel("gemini-2.5-pro")
 
 async def ingest_pdf_from_url(url: str):
-    async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
+    try:
+        async with httpx.AsyncClient() as client:
+            pdf = await client.get(url)
+            pdf.raise_for_status()
 
-    # best-effort filename
-    path = urlparse(url).path
-    filename = (path.split("/")[-1] or "document.pdf") or "document.pdf"
+        title = url.split("/")[-1].replace(".pdf", "")
+        doc_id = str(uuid.uuid4())
 
-    file_bytes = io.BytesIO(resp.content)
-    # adapt this call to match your actual ingest_pdf signature
-    await ingest_pdf(file=file_bytes, filename=filename)
+        ingest_pdf(pdf.content, doc_id, title)
+
+    except Exception as e:
+        print("PDF ingest error:", e)
 
 
 def extract_between_first_and_last(text: str):
