@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from typing import Optional
 from contextlib import asynccontextmanager
 from app.storage import init_db
-from app.services import stream_audio_from_list, get_llm_response, get_deepgram_transcription, stream_deepgram_transcription, ingest_pdf
+from app.services import stream_audio_from_list, get_llm_response, get_deepgram_transcription, stream_deepgram_transcription, ingest_pdf, summarise_history
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,6 +29,7 @@ app = FastAPI(
 
 chat_mem = {}
 user_configs = {}
+convo_summaries = {}
 
 origins = [
     "http://localhost:5173",
@@ -72,6 +73,7 @@ async def chat_endpoint(request: Request, body: ChatRequest):
 
     if user_id not in chat_mem:
         chat_mem[user_id] = []
+        convo_summaries[user_id] = ""
         user_configs[user_id] = {
             "rate": 0,
             "pitch": 0,
@@ -80,9 +82,28 @@ async def chat_endpoint(request: Request, body: ChatRequest):
             "accent_color": "brand-blue",
         }
 
+    if len(chat_mem[user_id]) % 5 == 0:
+        convo_summaries[user_id] = summarise_history(
+            chat_mem[user_id],
+            existing_summary=convo_summaries[user_id]
+        )
+
+    MAX_MESSAGES = 20  # 10 user + 10 agent, tweak as you like
     chat_mem[user_id].append({"role": "user", "content": user_text})
 
-    llm_response = get_llm_response(chat_mem[user_id], user_configs[user_id])
+    short_history = chat_mem[user_id][-MAX_MESSAGES:]
+
+    msg_history_for_llm = []
+    if convo_summaries[user_id]:
+        msg_history_for_llm.append({
+            "role": "system",
+            "content": f"Conversation so far (summary): {convo_summaries[user_id]}"
+        })
+    msg_history_for_llm.extend(short_history)
+
+
+    llm_response = get_llm_response(msg_history_for_llm, user_configs[user_id])
+
 
     agent_text_response = llm_response.get("text", "Sorry, I broke.")
     new_config = llm_response.get("config", {})

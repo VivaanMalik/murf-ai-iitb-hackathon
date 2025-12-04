@@ -44,3 +44,49 @@ def conversationofy(text: str) -> str:
     except Exception as e:
         print(f"❌ Groq Error: {e}")
         return str(e)
+    
+def summarise_history(messages, existing_summary=""):
+    """
+    Summarise the conversation history into a compact form suitable for long-term memory.
+    - messages: list of dicts [{role: "...", content: "..."}]
+    - existing_summary: previously stored summary text
+    """
+
+    # Build summarisation text
+    transcript = ""
+    for m in messages:
+        role = m["role"]
+        content = m["content"]
+        transcript += f"{role}: {content}\n"
+
+    prompt = f"""
+You are a conversation summariser. 
+Summarise the following chat into a concise memory that preserves:
+- what the user wants
+- key facts
+- tasks and constraints
+- important clarifications or instructions
+
+Do NOT include filler, greetings, stylistic fluff, or exact sentences.
+Keep it compact (5-10 bullet points MAX).
+
+Existing summary (if any):
+{existing_summary}
+
+New conversation:
+{transcript}
+
+Return ONLY the new updated summary.
+"""
+
+    resp = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {"role": "system", "content": "You are a summariser."},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=300,
+        temperature=0.2,
+    )
+
+    return resp.choices[0].message.content.strip()
