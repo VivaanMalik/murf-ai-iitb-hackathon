@@ -1,17 +1,30 @@
 import base64
 import os
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect # Add WebSocket
-from app.services import stream_deepgram_transcription, stream_audio_from_list, get_llm_response # Add stream_deepgram_transcription
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import StreamingResponse
-from app.services import stream_audio_from_list, get_llm_response, get_deepgram_transcription
 from typing import Optional
+from contextlib import asynccontextmanager
+from app.storage import init_db
+from app.services import stream_audio_from_list, get_llm_response, get_deepgram_transcription, stream_deepgram_transcription
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_db()
+    print("Database initialized")
+
+    yield  # App runs here
+
+    # Shutdown
+    print("App shutting down...")
 
 app = FastAPI(
     title="Murf Voice Agent API",
     description="Backend for conversational agent using Murf TTS and LLMs",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 chat_mem = {}
@@ -48,41 +61,55 @@ async def health_check():
     return {"status": "active", "service": "Murf Voice Agent"}
 
 # the avtual chat
-@app.post("/api/chat", response_model=ChatResponse)
-async def chat_endpoint(request: ChatRequest):
+@app.post("/api/chat")
+async def chat_endpoint(request: Request, body: ChatRequest):
     """
     Main conversational loop
     """
-
     # def users
-    user_id = request.user_id
-    user_text = request.user_message
+    user_id = body.user_id
+    user_text = body.user_message
+
     if user_id not in chat_mem:
         chat_mem[user_id] = []
         user_configs[user_id] = {
-            "rate": 0, 
-            "pitch": 0, 
+            "rate": 0,
+            "pitch": 0,
             "style": "Conversational",
             "temperature": 0.5,
-            "accent_color": "brand-blue"
+            "accent_color": "brand-blue",
         }
+
     chat_mem[user_id].append({"role": "user", "content": user_text})
 
     llm_response = get_llm_response(chat_mem[user_id], user_configs[user_id])
 
-    agent_text_response = llm_response.get("text", ["Sorry, I broke."])
+    agent_text_response = llm_response.get("text", "Sorry, I broke.")
     new_config = llm_response.get("config", {})
 
     if new_config:
         user_configs[user_id].update(new_config)
 
-    full_response_text = " ".join(agent_text_response)
-    chat_mem[user_id].append({"role": "assistant", "content": full_response_text})
+    chat_mem[user_id].append({"role": "assistant", "content": agent_text_response})
+
+    # ✅ makes stream cancellable
+    async def event_stream():
+        # stream_audio_from_list is a normal (sync) generator, so just `for`
+        for chunk in stream_audio_from_list(
+            agent_text_response,
+            user_configs[user_id]
+        ):
+            # if client disconnected, stop streaming
+            if await request.is_disconnected():
+                print(f"Client {user_id} disconnected, stopping stream")
+                break
+            yield chunk  # already NDJSON string with "\n"
 
     return StreamingResponse(
-        stream_audio_from_list(agent_text_response, user_configs[user_id], full_response_text),
-        media_type="application/x-ndjson"
+        event_stream(),
+        media_type="application/x-ndjson",
     )
+
 
 @app.post("/api/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
