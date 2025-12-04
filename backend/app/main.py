@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from typing import Optional
 from contextlib import asynccontextmanager
 from app.storage import init_db
-from app.services import stream_audio_from_list, get_llm_response, get_deepgram_transcription, stream_deepgram_transcription, ingest_pdf, summarise_history
+from app.services import stream_audio_from_list, get_llm_response, get_deepgram_transcription, stream_deepgram_transcription, ingest_pdf, summarise_history, find_pdf_links, ingest_pdf_from_url
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -67,6 +67,11 @@ async def chat_endpoint(request: Request, body: ChatRequest):
     """
     Main conversational loop
     """
+
+    pdf_urls = await find_pdf_links(body.user_message)
+    for url in pdf_urls:
+        await ingest_pdf_from_url(url)
+
     # def users
     user_id = body.user_id
     user_text = body.user_message
@@ -82,28 +87,21 @@ async def chat_endpoint(request: Request, body: ChatRequest):
             "accent_color": "brand-blue",
         }
 
-    if len(chat_mem[user_id]) % 5 == 0:
-        convo_summaries[user_id] = summarise_history(
-            chat_mem[user_id],
-            existing_summary=convo_summaries[user_id]
-        )
-
     MAX_MESSAGES = 20  # 10 user + 10 agent, tweak as you like
-    chat_mem[user_id].append({"role": "user", "content": user_text})
+    msg_history_for_llm = []
 
+    chat_mem[user_id].append({"role": "user", "content": user_text})
     short_history = chat_mem[user_id][-MAX_MESSAGES:]
 
-    msg_history_for_llm = []
     if convo_summaries[user_id]:
         msg_history_for_llm.append({
             "role": "system",
             "content": f"Conversation so far (summary): {convo_summaries[user_id]}"
         })
+
     msg_history_for_llm.extend(short_history)
 
-
     llm_response = get_llm_response(msg_history_for_llm, user_configs[user_id])
-
 
     agent_text_response = llm_response.get("text", "Sorry, I broke.")
     new_config = llm_response.get("config", {})
@@ -112,6 +110,20 @@ async def chat_endpoint(request: Request, body: ChatRequest):
         user_configs[user_id].update(new_config)
 
     chat_mem[user_id].append({"role": "assistant", "content": agent_text_response})
+
+    if len(chat_mem[user_id]) % 5 == 0:
+        convo_summaries[user_id] = summarise_history(
+            chat_mem[user_id],
+            existing_summary=convo_summaries[user_id]
+        )
+
+    chat_mem[user_id] = chat_mem[user_id][-MAX_MESSAGES:]
+
+
+
+
+
+
 
     # ✅ makes stream cancellable
     async def event_stream():

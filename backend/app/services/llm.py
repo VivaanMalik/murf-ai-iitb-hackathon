@@ -12,7 +12,6 @@ from app.storage import search_knowledge
 
 load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"), )
-formatter = Groq(api_key=os.getenv("GROQ_API_KEY_2"), )
 
 def format_kb_context(results, max_chars: int = 4000) -> str:
     """

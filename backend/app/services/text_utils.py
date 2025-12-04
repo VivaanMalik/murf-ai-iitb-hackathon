@@ -1,6 +1,36 @@
 import re
 from num2words import num2words
 from urllib.parse import urlparse
+from typing import List
+import httpx
+
+PDF_URL_PATTERN = re.compile(r'https?://\S+\.pdf\b', re.IGNORECASE)
+GENERIC_URL_PATTERN = re.compile(r'https?://\S+', re.IGNORECASE)
+
+async def find_pdf_links(text: str) -> List[str]:
+    links: set[str] = set()
+
+    # 1) Direct .pdf links in the message
+    for url in PDF_URL_PATTERN.findall(text):
+        links.add(url.strip(".,);]>'\""))
+
+    # 2) Other URLs – check if they are actually PDFs via HEAD
+    for url in GENERIC_URL_PATTERN.findall(text):
+        url = url.strip(".,);]>'\"")
+        if url in links:
+            continue
+
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=5) as client:
+                resp = await client.head(url)
+            content_type = resp.headers.get("content-type", "").lower()
+            if "application/pdf" in content_type:
+                links.add(str(resp.url))  # final resolved URL
+        except Exception:
+            # ignore failures; just means not a PDF or unreachable
+            continue
+
+    return list(links)
 
 def url_to_text(text: str) -> str:
     URL_PATTERN = re.compile(r'(https?://\S+|www\.\S+)', re.IGNORECASE)
