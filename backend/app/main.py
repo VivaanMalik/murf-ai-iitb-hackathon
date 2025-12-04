@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from typing import Optional
 from contextlib import asynccontextmanager
 from app.storage import init_db
-from app.services import stream_audio_from_list, get_llm_response, get_deepgram_transcription, stream_deepgram_transcription
+from app.services import stream_audio_from_list, get_llm_response, get_deepgram_transcription, stream_deepgram_transcription, ingest_pdf
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -136,6 +136,21 @@ async def websocket_endpoint(websocket: WebSocket):
         print("Client disconnected")
     except Exception as e:
         print(f"WS Error: {e}")
+
+@app.post("/api/upload_pdf")
+async def upload_pdf(file: UploadFile = File(...)):
+    if not file.filename.endswith(".pdf"):
+        return {"error": "Only PDF files allowed"}
+
+    pdf_bytes = await file.read()
+
+    result = ingest_pdf(
+        pdf_bytes=pdf_bytes,
+        title=file.filename,
+        doc_id="pdf:" + file.filename
+    )
+
+    return {"status": "ok", "stored": result}
 
 if __name__ == "__main__":
     import uvicorn

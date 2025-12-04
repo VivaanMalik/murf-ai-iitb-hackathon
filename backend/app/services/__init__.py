@@ -8,3 +8,4 @@ from .tools_arxiv import search_arxiv_papers
 from .tools_utils import ingest_text_with_gemini
 from .tools_web_search import search_general_web, search_patents
 from .tools_utils import *
+from .pdf_ingest import ingest_pdf

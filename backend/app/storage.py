@@ -5,7 +5,6 @@ import json
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 from dotenv import load_dotenv
-from groq import Groq
 import chromadb
 
 from sqlalchemy import (
@@ -18,8 +17,23 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.exc import SQLAlchemyError
+import google.generativeai as genai
+from dotenv import load_dotenv
+import os
 
 load_dotenv()
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+def embed_text(text: str) -> List[float]:
+    """
+    Get an embedding vector from Gemini for the given text.
+    Uses Google's text-embedding-004 model.
+    """
+    result = genai.embed_content(
+        model="models/text-embedding-004",  # or "models/gemini-embedding-001"
+        content=text,
+    )
+    return result["embedding"]
 
 # ----------------------------
 # Database setup (SQLite)
@@ -65,22 +79,11 @@ def init_db() -> None:
 # Embeddings + Chroma
 # ----------------------------
 
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
 chroma_client = chromadb.PersistentClient(path="./chromadb")
 collection = chroma_client.get_or_create_collection(
     name="doc_chunks",
     metadata={"hnsw:space": "cosine"},
 )
-
-
-def embed_text(text: str) -> List[float]:
-    """Get an embedding vector from Groq for the given text."""
-    resp = groq_client.embeddings.create(
-        model="text-embedding-3-small",
-        input=text,
-    )
-    return resp.data[0].embedding
 
 
 # ----------------------------
