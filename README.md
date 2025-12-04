@@ -21,6 +21,9 @@ wrap text
 
 TODO:
 
+Use PDF Better
+adjust rag viewer
+
 playwright
 interrupt
 
