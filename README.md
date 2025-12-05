@@ -18,25 +18,43 @@ VOX is a real-time conversational voice agent featuring live transcription, stre
 
 ## Tech Stack
 
-**Frontend:** React (Vite), TypeScript, TailwindCSS, ShadCN, Mermaid, KaTeX  
-**Backend:** FastAPI, Murf Falcon, Deepgram/AssemblyAI, ChromaDB, Python  
-**Other:** Web Audio API, WebSockets, embeddings, structured prompting  
+Backend (FastAPI)
+- FastAPI – REST & WebSocket backend
+- Uvicorn – ASGI server
+- Murf Falcon TTS – streaming text-to-speech
+- Deepgram / AssemblyAI – speech-to-text (WS + non-streaming)
+- ChromaDB – vector store for RAG
+- SQLite (knowledge.db) – document + chunk metadata
+- Sentence Transformers – embedding
+- Gemini / OpenAI / Groq – LLM inference
+- Arxiv API, Web Search tools – tool-augmented agent
+- pypdf – PDF extraction
+- httpx / aiohttp – async HTTP clients
+- Pydantic – models & validation
 
-## Environmental Variables
+Frontend (React + Vite + Tailwind + ShadCN)
+- React 18
+- Vite
+- TypeScript
+- TailwindCSS
+- ShadCN UI
+- Mermaid.js (diagrams)
+- KaTeX (math)
+- React-Markdown
+- Audio APIs (Web Audio, MediaRecorder, AudioContext)
+- Custom voice chat hook (useVoiceChat.ts)
+- Audio-reactive particles
+- Knowledge sidebar + citations
 
-In `.env`
+## APIs used
 
-    MURF_API_KEY=
+- MURF API
+- DEEPGRAM API
+- OPENAI API
+- GROQ API
+- GEMINI API
 
-    DEEPGRAM_API_KEY=
-
-    OPENAI_API_KEY=
-
-    GROQ_API_KEY=
-
-    GEMINI_API_KEY=
-    
-Eg: `.env.example`
+Check `.env.example` for a sample `.env`
 
 ## Setup
 
