@@ -53,16 +53,21 @@ def ingest_pdf(pdf_bytes: bytes, doc_id: str, title: str):
         Convert the following document into JSON chunks.
 
         Return ONLY valid JSON: a list of objects:
-        Dont send additional text, no codeblocks.
         [
-          {
-            "id": "unique-id",
-            "conversational": "...",
-            "key_details": ["...", "..."],
-            "source_extract": "...",
-            "faq": [{"q": "...", "a": "..."}]
-          }
+            {
+                "id": "unique-id",
+                "conversational": "...",
+                "key_details": ["...", "..."],
+                "source_extract": "...",
+                "faq": [{"q": "...", "a": "..."}]
+            }
         ]
+
+        Chunking rules:
+        - Split by semantic topics/sections, NOT arbitrary length.
+        - Each chunk's "source_extract" should be roughly 300–800 words.
+        - Never let "source_extract" exceed 1500 characters.
+        - Prefer more, smaller chunks over fewer, huge ones.
 
         Text:
         """ + raw_text

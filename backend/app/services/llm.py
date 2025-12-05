@@ -1,14 +1,15 @@
 import os
 import json
 import re
+import uuid
 from dotenv import load_dotenv
 from groq import Groq
-
 from .text_format import conversationofy
 from .tools_arxiv import search_arxiv_papers
 from .tools_web_search import search_general_web, search_patents
 from .tool_python import execute_safe_python
 from app.storage import search_knowledge
+from .tools_utils import store_document_chunks, save_arxiv_to_rag, save_code_result_to_rag, save_patent_result_to_rag, save_web_result_to_rag
 
 load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"), )
@@ -87,6 +88,7 @@ Available Tools:
 - SEARCH_WEB: Use for general knowledge, up-to-date news, company data, or any query that is not academic or patent-related. Remember to use appropriate args.
 - SEARCH_PATENTS: Use when the user asks about intellectual property or specific technical inventions (e.g., Google Patents). Any patent-related work, call this.
 - EXECUTE_CODE: Use when the user asks for a complex calculation or logic problem, or to **generate data for a plot**. The libraries **math** and **numpy (as np)** are pre-imported and available globally; **do not use import statements.** The argument 'args' MUST contain only the Python code. The final output (e.g., the answer, or an array of data for a chart) MUST be stored in a variable named 'result'.
+- ANSWER: Use when the answer might be stored in the database and can be retrieved.
 
 CRITICAL RULES:
 - If using any tool, anything in the "text" field must be short, concise and not give everything away.
@@ -103,9 +105,7 @@ Example: User says "what is 17 factorial" -> Output: {{"text": "I will calculate
 Example: User says "what is the dot product of [1,2] and [3,4]" -> Output: {{"text": "I will calculate that for you.", "config": {{}}, "tool": "EXECUTE_CODE", "args": "A = np.array([1, 2])\nB = np.array([3, 4])\nresult = np.dot(A, B)"}}
 Example: User says "find 10 intervals of pi/50 for sin(x)" -> Output: {{"text": "I will calculate that data for you.", "config": {{}}, "tool": "EXECUTE_CODE", "args": "x = np.linspace(0, 10 * math.pi/50, 11)\ny = np.sin(x)\nresult = [x.tolist(), y.tolist()]"}}
 """
-            # - READ_DOCUMENT: Use specifically when a link is a PDF file (which standard web scrapers often fail to read correctly).
-            # - SAVE_NOTE: Use to store a specific, important fact or quote found during research so you can reference it in the final answer.
-
+        
         messages = []
 
         if kb_context:
@@ -118,6 +118,12 @@ Example: User says "find 10 intervals of pi/50 for sin(x)" -> Output: {{"text": 
             "role": "system",
             "content": base_system_prompt,
         })
+
+        for gm in build_source_gating_messages(kb_results):
+            messages.append({
+                "role": "system",
+                "content": gm
+            })
 
         messages.extend(msg_history)
 
@@ -220,13 +226,44 @@ Example: User says "find 10 intervals of pi/50 for sin(x)" -> Output: {{"text": 
         raw_text_content = ""
 
         if tool_used == "SEARCH_ARXIV":
-            raw_text_content = json_response.get("text", "")+"\n"+conversationofy(search_arxiv_papers(json_response.get("args", "")))
+            tool_query = json_response.get("args", "")
+            arxiv_raw = search_arxiv_papers(tool_query)  # full formatted paper text 
+            conv = conversationofy(arxiv_raw)
+            raw_text_content = json_response.get("text", "") + "\n" + conv
+
+            save_arxiv_to_rag(tool_query, arxiv_raw)
+
         elif tool_used == "SEARCH_WEB":
-            raw_text_content = conversationofy(f"Searching the web for '{json_response.get("args", "")}'\n \n{search_general_web(json_response.get("args", ""))}")
+            tool_query = json_response.get("args", "")
+            web_raw = search_general_web(tool_query)     # Tavily result 
+            raw_text_content = (
+                f"Searching the web for '{tool_query}'\n\n{web_raw}"
+            )
+
+            save_web_result_to_rag(tool_query, web_raw)
+
         elif tool_used == "SEARCH_PATENTS":
-            raw_text_content = conversationofy(f"Searching patent databases for '{json_response.get("args", "")}'\n\n{search_patents(json_response.get("args", ""))}")
+            tool_query = json_response.get("args", "")
+            patent_raw = search_patents(tool_query)      # Cleaned patent summary 
+            raw_text_content = (
+                f"Searching patent databases for '{tool_query}'\n\n{patent_raw}"
+            )
+
+            save_patent_result_to_rag(tool_query, patent_raw)
+            
         elif tool_used == "EXECUTE_CODE":
-            raw_text_content = "```\n" + json_response.get("args", "") + "\n```\n \n"+ conversationofy(json_response.get("text", "")+"Result: \n"+execute_safe_python(json_response.get("args", "")))
+            code = json_response.get("args", "")
+            exec_result = execute_safe_python(code)      # sandboxed Python result 
+            raw_text_content = (
+                json_response.get("text", "")
+                + "\n\nCode executed successfully.\n\n```python\n"
+                + code
+                + "\n```\n\nResult:\n"
+                + exec_result
+            )
+
+            save_code_result_to_rag(code, exec_result, user_query)
+
         else:
             raw_text_content = json_response.get("text", "")
             if isinstance(raw_text_content, list):
@@ -243,3 +280,97 @@ Example: User says "find 10 intervals of pi/50 for sin(x)" -> Output: {{"text": 
         print(json_response)
         print()
         return json_response
+
+def save_tool_result_to_rag(tool_used: str, query: str, content: str) -> None:
+    """
+    Save tool output (arXiv, web, patent, python) into the RAG DB.
+
+    - tool_used: "SEARCH_ARXIV" | "SEARCH_WEB" | "SEARCH_PATENTS" | "EXECUTE_CODE"
+    - query: usually json_response["args"] (the tool argument)
+    - content: the raw text result from the tool
+    """
+    if not content:
+        return
+
+    # Stable-ish mapping from tool -> source label in DB
+    source_map = {
+        "SEARCH_ARXIV": "arxiv",
+        "SEARCH_WEB": "web",
+        "SEARCH_PATENTS": "patent",
+        "EXECUTE_CODE": "python",
+    }
+    source = source_map.get(tool_used, "notes")
+
+    doc_id = f"{source}:{uuid.uuid4()}"
+    title = f"{source.capitalize()} result for: {query[:80]}"
+
+    conversational = (
+        conversationofy(content) if tool_used != "EXECUTE_CODE" else content
+    )
+
+    chunks = [{
+        "id": f"{doc_id}:chunk-0",
+        "conversational": conversational,
+        "key_details": [
+            f"Tool: {tool_used}",
+            f"Query: {query}",
+        ],
+        "source_extract": content,
+        "faq": [
+            {
+                "q": query,
+                "a": conversational[:1500],  # short-ish answer for FAQ
+            }
+        ],
+    }]
+
+    store_document_chunks(
+        doc_id=doc_id,
+        title=title,
+        source=source,
+        chunks=chunks,
+        extra_meta={"tool": tool_used, "query": query},
+    )
+
+def build_source_gating_messages(kb_results):
+    """
+    Look at retrieved KB results and add system messages telling the model
+    NOT to re-run the corresponding tool unless explicitly asked.
+    """
+    sources_present = {r["source"] for r in kb_results}
+
+    gating_messages = []
+
+    if "arxiv" in sources_present:
+        gating_messages.append("""
+You ALREADY have arXiv-derived knowledge in the retrieved context above.
+For follow-up questions about that same paper, you MUST use the ANSWER tool
+or no tool. Do NOT call SEARCH_ARXIV again unless the user explicitly asks
+for a new/different paper or explicitly says: 'search arxiv'.
+""")
+
+    if "web" in sources_present:
+        gating_messages.append("""
+You ALREADY have web search results in the retrieved context above.
+For follow-up questions about that same topic, use the ANSWER tool
+or no tool. Do NOT call SEARCH_WEB again unless the user explicitly requests
+a fresh web search or new updated information.
+""")
+
+    if "patent" in sources_present:
+        gating_messages.append("""
+You ALREADY have patent search results in the retrieved context above.
+For follow-up questions about that same invention/topic, use the ANSWER tool
+or no tool. Do NOT call SEARCH_PATENTS again unless the user explicitly asks
+for a different patent or explicitly requests another patent lookup.
+""")
+
+    if "python" in sources_present:
+        gating_messages.append("""
+You ALREADY have Python execution results in the retrieved context above.
+If the answer can be derived from previously executed code, use ANSWER.
+Do NOT call EXECUTE_CODE again unless the user explicitly asks to run new code
+or requests a different computation.
+""")
+
+    return gating_messages
