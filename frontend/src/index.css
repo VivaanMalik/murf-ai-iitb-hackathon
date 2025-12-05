@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Standard Low-Contrast Dark Theme (Cool Gray/Blue Base Hue: 220) */
+    
+    /* Global Colors */
+    --background: 220 10% 10%;       /* Deep, subtle dark gray */
+    --foreground: 220 20% 95%;       /* Soft white text */
+
+    /* Container Colors (Card, Popover) */
+    --card: 220 10% 15%;             /* Slightly lighter than background */
+    --card-foreground: 220 20% 95%;
+
+    --popover: 220 10% 15%;
+    --popover-foreground: 220 20% 95%;
+
+    /* Primary Accent Colors (Buttons, Main Highlighting) */
+    --primary: 220 90% 60%;          /* Vivid but not neon blue */
+    --primary-foreground: 220 20% 10%;
+
+    /* Secondary Elements (Less prominent containers) */
+    --secondary: 220 15% 20%;
+    --secondary-foreground: 220 20% 95%;
+
+    /* Muted (Placeholder text, subtle hover states) */
+    --muted: 220 15% 18%;
+    --muted-foreground: 220 15% 60%;
+
+    /* Accent (Used for emphasis, same as primary here) */
+    --accent: 220 90% 60%;
+    --accent-foreground: 220 20% 10%;
+    --accent-glow: 220 90% 60% / 0.4;
+
+    /* Alerts and Feedback */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 220 20% 95%;
+
+    /* Utility Colors */
+    --border: 220 15% 25%;           /* Subtle border color */
+    --input: 220 15% 20%;
+    --ring: 220 90% 60%;
+
+    --radius: 0.5rem; /* Smoother, non-sci-fi radius */
+
+    /* Chat Bubble Colors (Low-Contrast WhatsApp Style) */
+    --user-bubble: 220 90% 25%;      /* Dark, saturated blue */
+    --agent-bubble: 220 10% 15%;     /* Subtle gray bubble (close to background) */
+    --agent-bubble-border: 220 15% 20%;
+    
+    /* Recording/Voice Tokens */
+    --record-button: 220 90% 60%;
+    --record-button-active: 348 80% 60%; /* Red/Active */
+    
+    --waveform: 220 90% 70%;
+    --gradient-voice: linear-gradient(135deg, hsl(220 90% 60%), hsl(240 80% 70%));
+    
+    /* Citation card colors */
+    --citation-card: 220 15% 20%;
+    --citation-card-border: 220 90% 60%;
+    --citation-label: 220 90% 70%;
+  }
+  
+  /* Light mode */
+  .light {
+    --background: 0 0% 100%;             /* Pure White */
+    --foreground: 220 20% 10%;           /* Near-Black Text */
+    
+    --card: 0 0% 98%;
+    --card-foreground: 220 20% 10%;
+    
+    --popover: 0 0% 98%;
+    --popover-foreground: 220 20% 10%;
+    
+    --primary: 220 90% 50%;
+    --primary-foreground: 0 0% 98%;
+    
+    --secondary: 220 10% 90%;
+    --secondary-foreground: 220 20% 10%;
+    
+    --muted: 220 10% 95%;
+    --muted-foreground: 220 10% 40%;
+    
+    --accent: 220 90% 50%;
+    --accent-foreground: 0 0% 98%;
+    --accent-glow: 220 90% 50% / 0.3;
+    
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 220 10% 80%;
+    --input: 220 10% 90%;
+    --ring: 220 90% 50%;
+    
+    /* Chat Bubble Colors */
+    --user-bubble: 220 80% 88%;      /* Light pastel blue */
+    --agent-bubble: 220 10% 95%;     /* Subtle off-white */
+    --agent-bubble-border: 220 10% 85%;
+    
+    --record-button: 220 90% 50%;
+    --record-button-active: 348 80% 50%;
+    
+    --waveform: 220 90% 60%;
+    
+    --citation-card: 0 0% 98%;
+    --citation-card-border: 220 10% 85%;
+    --citation-label: 220 60% 40%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Removed .glow-text utility */
+  
+  @keyframes wave {
+    0%, 100% {
+      transform: scaleY(1);
+    }
+    50% {
+      transform: scaleY(1.5);
+    }
+  }
+}
