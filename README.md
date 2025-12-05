@@ -18,7 +18,7 @@ VOX is a real-time conversational voice agent featuring live transcription, stre
 
 ## Tech Stack
 
-Backend (FastAPI)
+### Backend (FastAPI)
 - FastAPI – REST & WebSocket backend
 - Uvicorn – ASGI server
 - Murf Falcon TTS – streaming text-to-speech
@@ -32,7 +32,7 @@ Backend (FastAPI)
 - httpx / aiohttp – async HTTP clients
 - Pydantic – models & validation
 
-Frontend (React + Vite + Tailwind + ShadCN)
+### Frontend (React + Vite + Tailwind + ShadCN)
 - React 18
 - Vite
 - TypeScript
@@ -53,6 +53,8 @@ Frontend (React + Vite + Tailwind + ShadCN)
 - OPENAI API
 - GROQ API
 - GEMINI API
+- ChromaDB
+- Local PDF Processor (pymupdf)
 
 Check `.env.example` for a sample `.env`
 

@@ -1,5 +1,3 @@
-import base64
-import os
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect, Request, BackgroundTasks

@@ -1,5 +1,3 @@
-# app/routes_knowledge.py
-
 from datetime import datetime
 from typing import Any, List, Optional
 
@@ -12,18 +10,12 @@ from app.storage import SessionLocal, Document, Chunk, delete_document_and_chunk
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
-
-# --- DB dependency ---
-
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-
-# --- Schemas ---
 
 class DocumentOut(BaseModel):
     id: str
@@ -40,17 +32,12 @@ class ChunkOut(BaseModel):
     id: str
     doc_id: str
     conversational: str
-    # NOTE: we keep these very loose on the API surface so they can never
-    # cause a ResponseValidationError, even if the DB contents are weird.
     key_details: Optional[Any] = None
     source_extract: Optional[str] = None
     faq: Optional[Any] = None
 
     class Config:
         orm_mode = True
-
-
-# --- Helpers to convert ORM -> clean dicts ---
 
 def _parse_json_field(raw: Any):
     """
@@ -82,7 +69,6 @@ def serialize_document(doc: Document) -> DocumentOut:
         created_at=doc.created_at,
     )
 
-
 def serialize_chunk(chunk: Chunk) -> ChunkOut:
     return ChunkOut(
         id=chunk.id,
@@ -93,9 +79,6 @@ def serialize_chunk(chunk: Chunk) -> ChunkOut:
         faq=_parse_json_field(chunk.faq),
     )
 
-
-# --- Routes ---
-
 @router.get("/documents", response_model=List[DocumentOut])
 def list_documents(db: Session = Depends(get_db)):
     """
@@ -104,7 +87,6 @@ def list_documents(db: Session = Depends(get_db)):
     """
     docs = db.query(Document).order_by(Document.created_at.desc()).all()
     return [serialize_document(d) for d in docs]
-
 
 @router.get("/documents/{doc_id}", response_model=DocumentOut)
 def get_document(doc_id: str, db: Session = Depends(get_db)):
@@ -115,7 +97,6 @@ def get_document(doc_id: str, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return serialize_document(doc)
-
 
 @router.get("/chunks", response_model=List[ChunkOut])
 def list_chunks(doc_id: Optional[str] = None, db: Session = Depends(get_db)):
@@ -128,7 +109,6 @@ def list_chunks(doc_id: Optional[str] = None, db: Session = Depends(get_db)):
 
     chunks = query.all()
     return [serialize_chunk(c) for c in chunks]
-
 
 @router.get("/chunks/{chunk_id}", response_model=ChunkOut)
 def get_chunk(chunk_id: str, db: Session = Depends(get_db)):
@@ -170,7 +150,6 @@ def delete_document(doc_id: str, db: Session = Depends(get_db)):
             print(f"⚠️ Chroma delete failed for doc {doc_id}: {e}")
 
     return {"status": "ok", "deleted_doc_id": doc_id, "deleted_chunks": len(chunk_ids)}
-
 
 @router.delete("/chunks/{chunk_id}")
 def delete_chunk(chunk_id: str, db: Session = Depends(get_db)):

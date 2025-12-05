@@ -5,11 +5,9 @@ python-dotenv
 requests
 
 groq
-google-genai
 
 deepgram-sdk
 tavily-python
-googlesearch-python
 arxiv
 pymupdf
 

@@ -1,7 +1,6 @@
 import fitz
 import json
 import os
-import io
 import httpx
 import uuid
 import google.generativeai as genai
