@@ -64,3 +64,9 @@ Check `.env.example` for a sample `.env`
 `buildfrontend.sh`
 
 requires: python, nodejs, npm
+
+## Demo
+
+<video src="assets/demo_video.mp4" controls width="600">
+  Your browser does not support the video tag.
+</video>
