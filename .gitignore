@@ -4,3 +4,4 @@ venv/
 .DS_Storesour
 backend/app/test.py
 backend/app/chromadb/
+backend/knowledge.db
