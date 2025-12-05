@@ -224,3 +224,86 @@ def search_knowledge(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         db.close()
 
     return out
+
+# ----------------------------
+# Delete helpers
+# ----------------------------
+
+def delete_document_and_chunks(doc_id: str) -> Dict[str, Any]:
+    """
+    Delete a document + all its chunks from SQLite and Chroma.
+    """
+    db = SessionLocal()
+    try:
+        # Gather chunk IDs
+        chunks = db.query(Chunk).filter(Chunk.doc_id == doc_id).all()
+        chunk_ids = [c.id for c in chunks]
+
+        # Delete chunks from DB
+        for ch in chunks:
+            db.delete(ch)
+
+        # Delete document
+        doc = db.query(Document).filter(Document.id == doc_id).first()
+        if not doc:
+            return {"status": "not_found"}
+
+        db.delete(doc)
+        db.commit()
+
+        # Delete embeddings from Chroma (best effort)
+        if chunk_ids:
+            try:
+                collection.delete(ids=chunk_ids)
+            except Exception as e:
+                # DB is already consistent; treat this as partial but not fatal
+                return {
+                    "status": "partial",
+                    "deleted_doc_id": doc_id,
+                    "deleted_chunks": len(chunk_ids),
+                    "vector_error": str(e),
+                }
+
+        return {
+            "status": "ok",
+            "deleted_doc_id": doc_id,
+            "deleted_chunks": len(chunk_ids),
+        }
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+def delete_chunk(chunk_id: str) -> Dict[str, Any]:
+    """
+    Delete a single chunk from SQLite and Chroma.
+    """
+    db = SessionLocal()
+    try:
+        chunk = db.query(Chunk).filter(Chunk.id == chunk_id).first()
+        if not chunk:
+            return {"status": "not_found"}
+
+        db.delete(chunk)
+        db.commit()
+
+        # Remove from Chroma
+        try:
+            collection.delete(ids=[chunk_id])
+        except Exception as e:
+            return {
+                "status": "partial",
+                "deleted_chunk_id": chunk_id,
+                "vector_error": str(e),
+            }
+
+        return {"status": "ok", "deleted_chunk_id": chunk_id}
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()

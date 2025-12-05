@@ -21,15 +21,10 @@ wrap text
 
 TODO:
 
-Use PDF Better
-adjust rag viewer
-
 playwright
-interrupt
 
 UI - mid
 mermaid markdown and present it
-posprocess tool's outputs to put in conversational language
 OCR
 
 Qwen instruct

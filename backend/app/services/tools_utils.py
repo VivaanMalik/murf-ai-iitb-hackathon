@@ -220,6 +220,49 @@ def save_code_result_to_rag(code: str, exec_result: str, user_query: str = ""):
         extra_meta={"tool": "EXECUTE_CODE", "query": user_query},
     )
 
+def save_mermaid_diagram_to_rag(
+    mermaid_code: str,
+    user_query: str = "",
+    description: str = ""
+):
+    """
+    Save a Mermaid diagram (code + optional description) into RAG so you can
+    reuse the visualization / structure later.
+    """
+    if not mermaid_code and not description:
+        return
+
+    doc_id = f"mermaid:{uuid.uuid4()}"
+    title_snippet = mermaid_code.replace("\n", " ")[:80]
+    title = f"Mermaid diagram: {title_snippet}"
+
+    raw_text = f"Mermaid code:\n{mermaid_code}\n\nDescription:\n{description}"
+
+    text_chunks = chunk_text_paragraphs(raw_text, max_chars=1500)
+
+    chunks = []
+    total_parts = len(text_chunks)
+    for i, chunk_text in enumerate(text_chunks):
+        chunks.append({
+            "id": f"{doc_id}:chunk-{i}",
+            "conversational": chunk_text,
+            "key_details": [
+                "Tool: RENDER_MERMAID",
+                f"Original query: {user_query}",
+                f"Part: {i+1}/{total_parts}",
+            ],
+            "source_extract": chunk_text,
+            "faq": [],
+        })
+
+    store_document_chunks(
+        doc_id=doc_id,
+        title=title,
+        source="mermaid",
+        chunks=chunks,
+        extra_meta={"tool": "RENDER_MERMAID", "query": user_query},
+    )
+
 def chunk_text_paragraphs(text: str, max_chars: int = 1200) -> list[str]:
     """
     Very simple semantic chunking:

@@ -9,7 +9,7 @@ from .tools_arxiv import search_arxiv_papers
 from .tools_web_search import search_general_web, search_patents
 from .tool_python import execute_safe_python
 from app.storage import search_knowledge
-from .tools_utils import store_document_chunks, save_arxiv_to_rag, save_code_result_to_rag, save_patent_result_to_rag, save_web_result_to_rag
+from .tools_utils import store_document_chunks, save_arxiv_to_rag, save_code_result_to_rag, save_patent_result_to_rag, save_web_result_to_rag, save_mermaid_diagram_to_rag
 
 load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"), )
@@ -88,6 +88,7 @@ Available Tools:
 - SEARCH_WEB: Use for general knowledge, up-to-date news, company data, or any query that is not academic or patent-related. Remember to use appropriate args.
 - SEARCH_PATENTS: Use when the user asks about intellectual property or specific technical inventions (e.g., Google Patents). Any patent-related work, call this.
 - EXECUTE_CODE: Use when the user asks for a complex calculation or logic problem, or to **generate data for a plot**. The libraries **math** and **numpy (as np)** are pre-imported and available globally; **do not use import statements.** The argument 'args' MUST contain only the Python code. The final output (e.g., the answer, or an array of data for a chart) MUST be stored in a variable named 'result'.
+- RENDER_MERMAID: Use this tool when the user asks for a diagram, graph, flowchart, architecture map, hierarchy, network, dependency graph, algorithm flow, or any structured visualization. The output should be a Mermaid diagram. The "args" field MUST contain ONLY Mermaid syntax (NO code fences). The "text" field must contain a short acknowledgement ONLY. Mermaid syntax MUST be valid (e.g., graph TD, sequenceDiagram, classDiagram, stateDiagram). DO NOT forget to put semicolons.
 - ANSWER: Use when the answer might be stored in the database and can be retrieved.
 
 CRITICAL RULES:
@@ -104,6 +105,7 @@ Example: User says "can you tell me about [PAPER]" -> Output: {{"text": "I will 
 Example: User says "what is 17 factorial" -> Output: {{"text": "I will calculate that for you.", "config": {{}}, "tool": "EXECUTE_CODE", "args": "result = math.factorial(17)"}}
 Example: User says "what is the dot product of [1,2] and [3,4]" -> Output: {{"text": "I will calculate that for you.", "config": {{}}, "tool": "EXECUTE_CODE", "args": "A = np.array([1, 2])\nB = np.array([3, 4])\nresult = np.dot(A, B)"}}
 Example: User says "find 10 intervals of pi/50 for sin(x)" -> Output: {{"text": "I will calculate that data for you.", "config": {{}}, "tool": "EXECUTE_CODE", "args": "x = np.linspace(0, 10 * math.pi/50, 11)\ny = np.sin(x)\nresult = [x.tolist(), y.tolist()]"}}
+Example: User says "Draw a diagram of gradient descent." -> Output: {{"text": "I will generate the diagram for you.", "config": {{}}, "tool": "RENDER_MERMAID", "args": "graph TD; A[Start] --> B[Compute gradient]; B --> C[Update weights]; C --> D[Repeat];"}}
 """
         
         messages = []
@@ -236,8 +238,9 @@ Example: User says "find 10 intervals of pi/50 for sin(x)" -> Output: {{"text": 
         elif tool_used == "SEARCH_WEB":
             tool_query = json_response.get("args", "")
             web_raw = search_general_web(tool_query)     # Tavily result 
+            conv = conversationofy(web_raw)
             raw_text_content = (
-                f"Searching the web for '{tool_query}'\n\n{web_raw}"
+                f"Searching the web for '{tool_query}'\n\n{conv}"
             )
 
             save_web_result_to_rag(tool_query, web_raw)
@@ -245,8 +248,9 @@ Example: User says "find 10 intervals of pi/50 for sin(x)" -> Output: {{"text": 
         elif tool_used == "SEARCH_PATENTS":
             tool_query = json_response.get("args", "")
             patent_raw = search_patents(tool_query)      # Cleaned patent summary 
+            conv = conversationofy(patent_raw)
             raw_text_content = (
-                f"Searching patent databases for '{tool_query}'\n\n{patent_raw}"
+                f"Searching patent databases for '{tool_query}'\n\n{conv}"
             )
 
             save_patent_result_to_rag(tool_query, patent_raw)
@@ -254,16 +258,29 @@ Example: User says "find 10 intervals of pi/50 for sin(x)" -> Output: {{"text": 
         elif tool_used == "EXECUTE_CODE":
             code = json_response.get("args", "")
             exec_result = execute_safe_python(code)      # sandboxed Python result 
-            raw_text_content = (
-                json_response.get("text", "")
-                + "\n\nCode executed successfully.\n\n```python\n"
+            raw_text_content = ("```python\n"
                 + code
-                + "\n```\n\nResult:\n"
-                + exec_result
+                + "\n```\n\n"
+                + conversationofy(json_response.get("text", "")+ "Result:\n" + exec_result)
             )
 
             save_code_result_to_rag(code, exec_result, user_query)
 
+        elif tool_used == "RENDER_MERMAID":
+            mermaid_code = json_response.get("args", "")
+            
+            raw_text_content = (
+                json_response.get("text", "")
+                + "\n```mermaid\n"
+                + mermaid_code
+                + "\n```"
+            )
+
+            save_mermaid_diagram_to_rag(
+                mermaid_code=mermaid_code,
+                user_query=user_query,
+                description=json_response.get("text", "")
+            )
         else:
             raw_text_content = json_response.get("text", "")
             if isinstance(raw_text_content, list):

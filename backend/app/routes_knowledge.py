@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.storage import SessionLocal, Document, Chunk
+from app.storage import SessionLocal, Document, Chunk, delete_document_and_chunks, delete_chunk as storage_delete_chunk, collection
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
@@ -139,3 +139,55 @@ def get_chunk(chunk_id: str, db: Session = Depends(get_db)):
     if not chunk:
         raise HTTPException(status_code=404, detail="Chunk not found")
     return serialize_chunk(chunk)
+
+@router.delete("/documents/{doc_id}")
+def delete_document(doc_id: str, db: Session = Depends(get_db)):
+    """
+    Delete a document and all its chunks (DB + Chroma).
+    """
+    # Fetch doc
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Fetch chunks for that doc
+    chunks = db.query(Chunk).filter(Chunk.doc_id == doc_id).all()
+    chunk_ids = [c.id for c in chunks]
+
+    # Delete chunks from DB
+    for c in chunks:
+      db.delete(c)
+
+    # Delete document from DB
+    db.delete(doc)
+    db.commit()
+
+    # Delete from Chroma (ignore errors)
+    if chunk_ids:
+        try:
+            collection.delete(ids=chunk_ids)
+        except Exception as e:
+            print(f"⚠️ Chroma delete failed for doc {doc_id}: {e}")
+
+    return {"status": "ok", "deleted_doc_id": doc_id, "deleted_chunks": len(chunk_ids)}
+
+
+@router.delete("/chunks/{chunk_id}")
+def delete_chunk(chunk_id: str, db: Session = Depends(get_db)):
+    """
+    Delete a single chunk (DB + Chroma).
+    """
+    chunk = db.query(Chunk).filter(Chunk.id == chunk_id).first()
+    if not chunk:
+        raise HTTPException(status_code=404, detail="Chunk not found")
+
+    db.delete(chunk)
+    db.commit()
+
+    # Remove from Chroma
+    try:
+        collection.delete(ids=[chunk_id])
+    except Exception as e:
+        print(f"⚠️ Chroma delete failed for chunk {chunk_id}: {e}")
+
+    return {"status": "ok", "deleted_chunk_id": chunk_id}

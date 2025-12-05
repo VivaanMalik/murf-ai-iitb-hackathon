@@ -71,7 +71,7 @@ def smart_split(text: str):
             curr_line = ""
             continue
 
-        if (char in ['.', '!', '?', ':', ';'] and not math_mode):
+        if (char in ['.', '!', '?', ':', ';', ','] and not math_mode):
             # Check if next char is space or end of string (avoid splitting 3.14)
             if i + 1 < len(text) and text[i+1] == ' ':
                 lines.append(curr_line.strip())
@@ -88,8 +88,11 @@ def smart_split(text: str):
 
     return lines
 
+def ignore_code_blocks(text: str) -> str:
+    return re.sub(r"```[\s\S]*?```", "", text).strip()
+
 def process_speech(text: str) -> str:
-    text = text.replace("```", "")
+    text = ignore_code_blocks(text)
     text = latex_to_speech(text)
     text = url_to_text(text)
     text = numbers_to_words(text)
