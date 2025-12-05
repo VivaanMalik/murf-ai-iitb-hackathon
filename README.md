@@ -25,11 +25,17 @@ VOX is a real-time conversational voice agent featuring live transcription, stre
 ## Environmental Variables
 
 In `.env`
+
     MURF_API_KEY=
+
     DEEPGRAM_API_KEY=
+
     OPENAI_API_KEY=
+
     GROQ_API_KEY=
+
     GEMINI_API_KEY=
+    
 Eg: `.env.example`
 
 ## Setup
