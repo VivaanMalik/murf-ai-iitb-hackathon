@@ -3,4 +3,4 @@ __pycache__/
 venv/
 .DS_Storesour
 backend/app/test.py
-*.sqlite3
+backend/app/chromadb/
