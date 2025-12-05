@@ -1,32 +1,40 @@
-uvicorn app.main:app --reload   
-lsof -ti:8000 | xargs kill -9
-run this in backend
+# VOX - Voice Ontology eXpert
 
-curl -X POST "http://localhost:8000/api/chat" -H "Content-Type: application/json" -d "{\"user_message\": \"You're so gay omgggg\"}" > /dev/null
-use for testing
+VOX is a real-time conversational voice agent featuring live transcription, streaming TTS, PDF ingestion, retrieval-augmented responses, diagram generation, web searches, patent searces, research paper searches and a modern audio-reactive interface. Built using Murf Falcon - the consistently fastest TTS API.
 
-TODO
-implement the other funcs
-deal with that 429 bs
+## Features
 
+- Real-time, interruptible, bidirectional voice chat  
+- Streaming Murf Falcon TTS  
+- Live speech-to-text (WebSocket + non-streaming)  
+- PDF ingestion → text extraction → chunking → embedding → ChromaDB storage  
+- Knowledge search + retrieval-augmented responses  
+- Multiple tools: Arxiv search, Python execution, web search, PDF tools  
+- Mermaid diagram generation in chat  
+- Markdown, code blocks, math (KaTeX)  
+- Audio-reactive UI components  
+- File sidebar + document viewer  
+- Fully typed frontend (TS/React/ShadCN) and modular backend
 
-Search for the 'Attention Is All You Need' paper and show me the formula for Scaled Dot-Product Attention.
+## Tech Stack
 
-Search for patents on a Perpetual Motion Machine.
+**Frontend:** React (Vite), TypeScript, TailwindCSS, ShadCN, Mermaid, KaTeX  
+**Backend:** FastAPI, Murf Falcon, Deepgram/AssemblyAI, ChromaDB, Python  
+**Other:** Web Audio API, WebSockets, embeddings, structured prompting  
 
-wrap text
+## Environmental Variables
 
+In `.env`
+    MURF_API_KEY=
+    DEEPGRAM_API_KEY=
+    OPENAI_API_KEY=
+    GROQ_API_KEY=
+    GEMINI_API_KEY=
+Eg: `.env.example`
 
+## Setup
 
+`buildbackend.sh`
+`buildfrontend.sh`
 
-TODO:
-
-playwright
-
-UI - mid
-mermaid markdown and present it
-OCR
-
-Qwen instruct
-
-Help pdf be better
+requires: python, nodejs, npm
