@@ -84,13 +84,13 @@ Available Settings:
 
 Available Tools:
 - SEARCH_ARXIV: Use when user asks about new papers. 'args' will store the query. The 'text' field should be a very brief, 1-sentence acknowledgement ONLY (e.g., "I will check arXiv for you."), as the tool output follows immediately.
-- ANSWER: Use when you have enough info about the topic to speak to the user. Use this to avoid searching for the same paper.
 - SEARCH_WEB: Use for general knowledge, up-to-date news, company data, or any query that is not academic or patent-related. Remember to use appropriate args.
 - SEARCH_PATENTS: Use when the user asks about intellectual property or specific technical inventions (e.g., Google Patents). Any patent-related work, call this.
 - EXECUTE_CODE: Use when the user asks for a complex calculation or logic problem, or to **generate data for a plot**. The libraries **math** and **numpy (as np)** are pre-imported and available globally; **do not use import statements.** The argument 'args' MUST contain only the Python code. The final output (e.g., the answer, or an array of data for a chart) MUST be stored in a variable named 'result'.
 
 CRITICAL RULES:
 - If using any tool, anything in the "text" field must be short, concise and not give everything away.
+- If your tool is NONE or empty, send a detailed "text" field such that all questions are answered.
 - If your text includes double quotes, you MUST escape them (e.g., \\") OR use single quotes (').
 - Only use tools when it feels appropriate.
 - Do NOT output invalid JSON.
@@ -222,30 +222,15 @@ Example: User says "find 10 intervals of pi/50 for sin(x)" -> Output: {{"text": 
         if tool_used == "SEARCH_ARXIV":
             raw_text_content = json_response.get("text", "")+"\n"+conversationofy(search_arxiv_papers(json_response.get("args", "")))
         elif tool_used == "SEARCH_WEB":
-            raw_text_content = f"Searching the web for '{json_response.get("args", "")}'\n \n{search_general_web(json_response.get("args", ""))}"
+            raw_text_content = conversationofy(f"Searching the web for '{json_response.get("args", "")}'\n \n{search_general_web(json_response.get("args", ""))}")
         elif tool_used == "SEARCH_PATENTS":
-            raw_text_content = f"Searching patent databases for '{json_response.get("args", "")}'\n\n{search_patents(json_response.get("args", ""))}"
+            raw_text_content = conversationofy(f"Searching patent databases for '{json_response.get("args", "")}'\n\n{search_patents(json_response.get("args", ""))}")
         elif tool_used == "EXECUTE_CODE":
-            raw_text_content = json_response.get("text", "")+"\n \n Code executed successfully. \n \n```\n" + json_response.get("args", "") + "\n```\n \nResult: \n"+execute_safe_python(json_response.get("args", ""))
+            raw_text_content = "```\n" + json_response.get("args", "") + "\n```\n \n"+ conversationofy(json_response.get("text", "")+"Result: \n"+execute_safe_python(json_response.get("args", "")))
         else:
             raw_text_content = json_response.get("text", "")
             if isinstance(raw_text_content, list):
                 raw_text_content = "".join(raw_text_content)
-
-        # final_sentence_list = []
-        # lines = (raw_text_content or "").split('\n')
-        # for line in lines:
-        #     # if not line.strip(): 
-        #     #     continue
-
-        #     sentences = re.split(r'(?<=[.!?,\:;])\s+', line)
-        #     sentences = [s.strip() for s in sentences]
-
-        #     for i, s in enumerate(sentences):
-        #         if i == len(sentences) - 1:
-        #             final_sentence_list.append(s + "\n")
-        #         else:
-        #             final_sentence_list.append(s + " ")
 
         json_response["text"] = raw_text_content
         print(json_response)

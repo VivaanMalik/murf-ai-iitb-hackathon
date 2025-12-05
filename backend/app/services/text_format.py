@@ -17,8 +17,8 @@ def conversationofy(text: str) -> str:
                     Rules:
                     - Output a single block of plain text.
                     - Do NOT use headings, bullet points, numbered lists, markdown, or emojis.
-                    - Keep it concise: about 3-10 sentences.
                     - Preserve all important facts, names, and numerical results, but you may omit boilerplate, repetition, and minor details.
+                    - Do NOT change quotated text
                     - Do not invent or speculate beyond what is in the input.
                     - Audience is a smart student; be clear, direct, and informal but still precise.
                     - Keep punctuation and casing normal; no ALL-CAPS.
